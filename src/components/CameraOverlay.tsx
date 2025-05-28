@@ -1,6 +1,5 @@
-
 import React, { useRef, useEffect, useState } from 'react';
-import { Camera, Mic, MicOff, Send, X } from 'lucide-react';
+import { Camera, CameraOff, Mic, MicOff, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import VoiceInput from './VoiceInput';
@@ -16,6 +15,7 @@ interface Message {
 const CameraOverlay = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isCameraOn, setIsCameraOn] = useState(true);
   const [isListening, setIsListening] = useState(false);
   const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -23,13 +23,18 @@ const CameraOverlay = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    startCamera();
+    if (isCameraOn) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [isCameraOn]);
 
   const startCamera = async () => {
     try {
@@ -44,6 +49,20 @@ const CameraOverlay = () => {
     } catch (error) {
       console.error('Error accessing camera:', error);
     }
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const toggleCamera = () => {
+    setIsCameraOn(!isCameraOn);
   };
 
   const handleSendMessage = async (text: string) => {
@@ -104,13 +123,22 @@ const CameraOverlay = () => {
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
       {/* Camera Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 w-full h-full object-cover"
-      />
+      {isCameraOn ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 w-full h-full bg-gray-900 flex items-center justify-center">
+          <div className="text-center">
+            <CameraOff className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-white text-lg">Camera is off</p>
+          </div>
+        </div>
+      )}
       
       {/* Overlay UI */}
       <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40">
@@ -200,11 +228,22 @@ const CameraOverlay = () => {
           </div>
         </div>
 
-        {/* Floating Camera Info */}
+        {/* Camera Toggle Button */}
         <div className="absolute top-1/2 left-4 transform -translate-y-1/2">
-          <div className="bg-white/10 backdrop-blur-md rounded-lg p-3 border border-white/20">
-            <Camera className="w-6 h-6 text-white" />
-          </div>
+          <Button
+            onClick={toggleCamera}
+            className={`${
+              isCameraOn 
+                ? 'bg-white/10 hover:bg-white/20' 
+                : 'bg-red-500 hover:bg-red-600'
+            } backdrop-blur-md rounded-lg p-3 border border-white/20`}
+          >
+            {isCameraOn ? (
+              <Camera className="w-6 h-6 text-white" />
+            ) : (
+              <CameraOff className="w-6 h-6 text-white" />
+            )}
+          </Button>
         </div>
       </div>
     </div>
