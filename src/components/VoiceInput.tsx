@@ -16,6 +16,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
 }) => {
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -23,7 +24,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       
-      recognitionRef.current.continuous = false;
+      recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = false;
       recognitionRef.current.lang = 'en-US';
 
@@ -32,29 +33,81 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
       };
 
       recognitionRef.current.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
+        const transcript = event.results[event.results.length - 1][0].transcript;
         console.log('Voice result:', transcript);
         onResult(transcript);
-        onListeningChange(false);
+        
+        // In continuous mode, don't stop listening
+        if (!isListening) {
+          onListeningChange(false);
+        }
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error('Voice recognition error:', event.error);
-        onListeningChange(false);
+        
+        // If in continuous mode and there's an error, try to restart
+        if (isListening && event.error !== 'aborted') {
+          console.log('Attempting to restart voice recognition...');
+          restartTimeoutRef.current = setTimeout(() => {
+            if (isListening && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (error) {
+                console.error('Failed to restart recognition:', error);
+              }
+            }
+          }, 1000);
+        }
       };
 
       recognitionRef.current.onend = () => {
         console.log('Voice recognition ended');
-        onListeningChange(false);
+        
+        // If we're supposed to be listening (continuous mode), restart
+        if (isListening) {
+          console.log('Restarting continuous listening...');
+          restartTimeoutRef.current = setTimeout(() => {
+            if (isListening && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (error) {
+                console.error('Failed to restart recognition:', error);
+              }
+            }
+          }, 500);
+        } else {
+          onListeningChange(false);
+        }
       };
     }
 
     return () => {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+      }
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
     };
   }, [onResult, onListeningChange]);
+
+  // Handle continuous listening state changes
+  useEffect(() => {
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Recognition already started or failed to start:', error);
+      }
+    } else if (!isListening && recognitionRef.current) {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+      recognitionRef.current.stop();
+    }
+  }, [isListening]);
 
   const toggleListening = () => {
     if (!isSupported) {
@@ -63,10 +116,13 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
     }
 
     if (isListening) {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
       recognitionRef.current?.stop();
       onListeningChange(false);
     } else {
-      recognitionRef.current?.start();
       onListeningChange(true);
     }
   };

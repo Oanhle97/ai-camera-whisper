@@ -17,6 +17,7 @@ const CameraOverlay = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [isContinuousMode, setIsContinuousMode] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -87,6 +88,15 @@ const CameraOverlay = () => {
     handleSendMessage(text);
   };
 
+  const toggleContinuousMode = () => {
+    setIsContinuousMode(!isContinuousMode);
+    if (!isContinuousMode) {
+      setIsListening(true);
+    } else {
+      setIsListening(false);
+    }
+  };
+
   const clearMessages = () => {
     setMessages([]);
   };
@@ -109,17 +119,32 @@ const CameraOverlay = () => {
         <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/50 to-transparent">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-white font-medium">AI Vision Active</span>
+              <div className={`w-3 h-3 rounded-full ${isContinuousMode ? 'bg-green-500 animate-pulse' : 'bg-red-500 animate-pulse'}`}></div>
+              <span className="text-white font-medium">
+                {isContinuousMode ? 'Continuous AI Listening' : 'AI Vision Active'}
+              </span>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearMessages}
-              className="text-white hover:bg-white/20"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={toggleContinuousMode}
+                size="sm"
+                className={`${
+                  isContinuousMode 
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-gray-500 hover:bg-gray-600'
+                } text-white`}
+              >
+                {isContinuousMode ? 'Auto ON' : 'Auto OFF'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearMessages}
+                className="text-white hover:bg-white/20"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -160,7 +185,7 @@ const CameraOverlay = () => {
             </div>
             
             <VoiceInput
-              isListening={isListening}
+              isListening={isListening || isContinuousMode}
               onListeningChange={setIsListening}
               onResult={handleVoiceResult}
             />
