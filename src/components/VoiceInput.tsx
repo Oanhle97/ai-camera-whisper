@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,12 +6,16 @@ interface VoiceInputProps {
   isListening: boolean;
   onListeningChange: (listening: boolean) => void;
   onResult: (text: string) => void;
+  onVoiceStart?: () => void;
+  onVoiceEnd?: () => void;
 }
 
 const VoiceInput: React.FC<VoiceInputProps> = ({
   isListening,
   onListeningChange,
-  onResult
+  onResult,
+  onVoiceStart,
+  onVoiceEnd
 }) => {
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -30,12 +33,14 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
 
       recognitionRef.current.onstart = () => {
         console.log('Voice recognition started');
+        onVoiceStart?.();
       };
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[event.results.length - 1][0].transcript;
         console.log('Voice result:', transcript);
         onResult(transcript);
+        onVoiceEnd?.();
         
         // In continuous mode, don't stop listening
         if (!isListening) {
@@ -90,7 +95,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({
         recognitionRef.current.stop();
       }
     };
-  }, [onResult, onListeningChange]);
+  }, [onResult, onListeningChange, onVoiceStart, onVoiceEnd]);
 
   // Handle continuous listening state changes
   useEffect(() => {

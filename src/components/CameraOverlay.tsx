@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { Camera, CameraOff, Mic, MicOff, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,6 +22,7 @@ const CameraOverlay = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [textInput, setTextInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const responseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (isCameraOn) {
@@ -32,6 +34,9 @@ const CameraOverlay = () => {
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
+      }
+      if (responseTimeoutRef.current) {
+        clearTimeout(responseTimeoutRef.current);
       }
     };
   }, [isCameraOn]);
@@ -65,7 +70,16 @@ const CameraOverlay = () => {
     setIsCameraOn(!isCameraOn);
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleVoiceStart = () => {
+    console.log('Voice input started - turning camera on');
+    setIsCameraOn(true);
+  };
+
+  const handleVoiceEnd = () => {
+    console.log('Voice input ended - will turn camera off after response');
+  };
+
+  const handleSendMessage = async (text: string, isVoiceInput = false) => {
     if (!text.trim()) return;
 
     const userMessage: Message = {
@@ -79,17 +93,37 @@ const CameraOverlay = () => {
     setTextInput('');
     setIsLoading(true);
 
-    // Simulate AI response - replace with actual AI integration
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: generateAIResponse(text),
-        isUser: false,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 2000);
+    // If this is from voice input, set up delayed response and camera turn off
+    if (isVoiceInput) {
+      responseTimeoutRef.current = setTimeout(() => {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: generateAIResponse(text),
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+        
+        // Turn off camera after response
+        setTimeout(() => {
+          console.log('Turning camera off after response');
+          setIsCameraOn(false);
+        }, 1000);
+      }, 2000);
+    } else {
+      // Immediate response for text input
+      setTimeout(() => {
+        const aiMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: generateAIResponse(text),
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+      }, 2000);
+    }
   };
 
   const generateAIResponse = (question: string): string => {
@@ -104,7 +138,7 @@ const CameraOverlay = () => {
   };
 
   const handleVoiceResult = (text: string) => {
-    handleSendMessage(text);
+    handleSendMessage(text, true);
   };
 
   const toggleContinuousMode = () => {
@@ -216,6 +250,8 @@ const CameraOverlay = () => {
               isListening={isListening || isContinuousMode}
               onListeningChange={setIsListening}
               onResult={handleVoiceResult}
+              onVoiceStart={handleVoiceStart}
+              onVoiceEnd={handleVoiceEnd}
             />
             
             <Button
